@@ -9,7 +9,7 @@ import io
 import sys
 
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, JobQueue, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
@@ -952,6 +952,20 @@ async def cleanup_thought_cache(context: ContextTypes.DEFAULT_TYPE) -> None:
         del context.bot_data['thought_caches'][message_id]
         logger.info(f"Cleaned up expired thought cache for message_id: {message_id}")
 
+async def set_bot_commands(application: Application):
+    """设置机器人的命令列表，以便在Telegram中显示提示"""
+    commands = [
+        BotCommand("start", "显示欢迎信息"),
+        BotCommand("help", "显示帮助和指令列表"),
+        BotCommand("settings", "打开设置菜单"),
+        BotCommand("new_chat", "在多轮模式下开启新对话"),
+        BotCommand("image", "快速生成一张图片"),
+        BotCommand("generate", "打开高级图片生成面板"),
+        BotCommand("speak", "将文本转换为语音"),
+        BotCommand("cancel", "取消当前操作"),
+    ]
+    await application.bot.set_my_commands(commands)
+
 @authorized
 async def toggle_thought_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理显示/隐藏思考摘要的按钮回调"""
@@ -1041,7 +1055,7 @@ def main() -> None:
     client = genai.Client(api_key=gemini_api_key, http_options=http_options)
     
     job_queue = JobQueue()
-    application = Application.builder().token(telegram_token).job_queue(job_queue).build()
+    application = Application.builder().token(telegram_token).job_queue(job_queue).post_init(set_bot_commands).build()
 
     # 注册指令处理器
     application.add_handler(CommandHandler("start", start_command))
