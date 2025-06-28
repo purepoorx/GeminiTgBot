@@ -771,11 +771,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # --- 检查是否在等待特定输入（如设置提示词） ---
     if user_data.get(user_id, {}).get('waiting_for') == 'system_prompt':
         user_data[user_id]['system_prompt'] = user_message
+        logger.info(f"用户 {user_id} 设置了新的系统提示词: '{user_message}'") # 日志1
         user_data[user_id]['waiting_for'] = None
         save_user_data()
         # 如果存在旧的多轮对话，则将其删除以强制使用新的系统提示词创建新会话
         if 'chat' in user_data[user_id]:
             del user_data[user_id]['chat']
+            logger.info(f"用户 {user_id} 的旧聊天会话已删除，以应用新的系统提示词。") # 日志2
         await message.reply_text(f"✅ 系统提示词已更新为: \"{user_message}\"\n\n您的下一条消息将自动开启一个应用了新提示的全新对话。")
         return
 
@@ -823,6 +825,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
 
         system_instruction_text = user_data[user_id].get('system_prompt')
+        logger.info(f"为用户 {user_id} 加载的系统提示词: '{system_instruction_text}'") # 日志3
         thinking_mode = user_data.get(user_id, {}).get('thinking_mode', False)
 
         # --- Build Content ---
@@ -848,6 +851,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # --- API Call ---
         if chat_mode == 'multi_turn':
             if 'chat' not in user_data[user_id] or user_data[user_id].get('chat_model_name') != chat_model:
+                logger.info(f"为用户 {user_id} 创建新的聊天会话，配置: {session_creation_config}") # 日志4
                 user_data[user_id]['chat'] = client.aio.chats.create(model=chat_model, config=session_creation_config, history=[])
                 user_data[user_id]['chat_model_name'] = chat_model
             chat = user_data[user_id]['chat']
