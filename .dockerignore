@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Environment
+.env
+
+# User data and logs
+user_settings.json
+*.log
+out.wav
+
+# Plan files
+PLAN.md
+PLAN_AUTH_DOCKER.md

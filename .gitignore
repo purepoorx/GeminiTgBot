@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+*.egg-info/
+
+# Environment
+.env
+
+# User data and sensitive configs
+user_settings.json
+auth.json
+*.log
+out.wav
+
+# IDE / Editor
+.vscode/
+.idea/

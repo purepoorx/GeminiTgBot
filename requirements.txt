@@ -1,0 +1,4 @@
+python-telegram-bot[job-queue]
+google-genai
+Pillow
+python-dotenv
