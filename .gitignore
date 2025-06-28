@@ -18,3 +18,9 @@ out.wav
 # IDE / Editor
 .vscode/
 .idea/
+
+# Plan files
+PLAN*.md
+
+# Data files
+data/

@@ -48,17 +48,14 @@ GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 
 ### 5. 配置授权用户
 
-首先，将 `auth.json.example` 文件复制并重命名为 `auth.json`。然后，编辑 `auth.json` 文件，将您的Telegram用户ID添加到 `allowed_user_ids` 列表中。`admin_user_id` 字段目前保留，可用于未来实现更复杂的权限管理。
+在您的 `.env` 文件中，添加一个新的环境变量 `AUTHORIZED_USER_IDS`。这是一个用**逗号**分隔的Telegram用户ID列表。
 
-```json
-{
-  "admin_user_id": 123456789,
-  "allowed_user_ids": [
-    123456789
-    // , 987654321 (请替换为您的Telegram用户ID)
-  ]
-}
+```env
+TELEGRAM_BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN"
+GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+AUTHORIZED_USER_IDS="123456789,987654321" # 将这里的ID替换为您自己的授权用户ID
 ```
+只有在这个列表中的用户才能使用机器人。
 
 ## 🏃‍♂️ 运行机器人
 

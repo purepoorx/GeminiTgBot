@@ -28,26 +28,24 @@ logger = logging.getLogger(__name__)
 user_data = {}
 message_text_cache = {}
 client: genai.Client = None
-USER_SETTINGS_FILE = "user_settings.json"
-AUTH_FILE = "auth.json"
+USER_SETTINGS_FILE = "data/user_settings.json"
 authorized_user_ids = set()
 
 # --- 授权 ---
-def load_authorized_users():
-    """从 auth.json 加载授权用户ID"""
+def load_authorized_users_from_env():
+    """从环境变量加载授权用户ID"""
     global authorized_user_ids
-    if os.path.exists(AUTH_FILE):
-        with open(AUTH_FILE, 'r') as f:
-            try:
-                data = json.load(f)
-                # 使用 set 以提高查找效率
-                authorized_user_ids = set(data.get("allowed_user_ids", []))
-                logger.info(f"已加载 {len(authorized_user_ids)} 个授权用户。")
-            except (json.JSONDecodeError, ValueError):
-                logger.error("无法解析授权文件 auth.json，将不允许任何用户。")
-                authorized_user_ids = set()
+    ids_str = os.getenv("AUTHORIZED_USER_IDS")
+    if ids_str:
+        try:
+            # 解析逗号分隔的ID字符串，并转换成整数集合
+            authorized_user_ids = {int(user_id.strip()) for user_id in ids_str.split(',')}
+            logger.info(f"已从环境变量加载 {len(authorized_user_ids)} 个授权用户。")
+        except ValueError:
+            logger.error("环境变量 AUTHORIZED_USER_IDS 格式错误，应为逗号分隔的数字ID。")
+            authorized_user_ids = set()
     else:
-        logger.warning("授权文件 auth.json 未找到，将不允许任何用户。")
+        logger.warning("环境变量 AUTHORIZED_USER_IDS 未设置，将不允许任何用户。")
         authorized_user_ids = set()
 
 def authorized(func):
@@ -80,6 +78,8 @@ def save_user_data():
         if 'chat_history' in data and isinstance(data['chat_history'], list):
              pass
 
+    # 确保目录存在
+    os.makedirs(os.path.dirname(USER_SETTINGS_FILE), exist_ok=True)
     with open(USER_SETTINGS_FILE, 'w') as f:
         json.dump(persistable_data, f, indent=4)
 
@@ -1024,7 +1024,7 @@ def main() -> None:
     """启动机器人"""
     load_dotenv()
     load_user_data()
-    load_authorized_users()
+    load_authorized_users_from_env()
     global client
     
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
