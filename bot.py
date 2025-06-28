@@ -773,8 +773,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user_data[user_id]['system_prompt'] = user_message
         user_data[user_id]['waiting_for'] = None
         save_user_data()
-        if 'chat' in user_data[user_id]: del user_data[user_id]['chat']
-        await message.reply_text(f"✅ 系统提示词已更新为: \"{user_message}\"")
+        # 如果存在旧的多轮对话，则将其删除以强制使用新的系统提示词创建新会话
+        if 'chat' in user_data[user_id]:
+            del user_data[user_id]['chat']
+        await message.reply_text(f"✅ 系统提示词已更新为: \"{user_message}\"\n\n您的下一条消息将自动开启一个应用了新提示的全新对话。")
         return
 
     gen_settings = context.user_data.get(GENERATE_SETTINGS_KEY)
