@@ -874,7 +874,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 user_data[user_id]['chat'] = client.aio.chats.create(model=chat_model, config=session_creation_config, history=[])
                 user_data[user_id]['chat_model_name'] = chat_model
             chat = user_data[user_id]['chat']
-            response_stream = await chat.send_message_stream(user_content_parts, config=request_config)
+            final_request_config = genai.types.GenerateContentConfig(
+                system_instruction=session_creation_config.system_instruction,
+                thinking_config=thinking_config
+            )
+            response_stream = await chat.send_message_stream(user_content_parts, config=final_request_config)
         else: # single_turn
             request_config.system_instruction = session_creation_config.system_instruction
             response_stream = await client.aio.models.generate_content_stream(model=chat_model, contents=user_content_parts, config=request_config)
