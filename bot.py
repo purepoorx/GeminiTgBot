@@ -166,7 +166,26 @@ async def optimize_prompt_async(prompt: str, negative_prompt: str) -> str:
     if not prompt: return ""
     optimization_text = prompt
     if negative_prompt: optimization_text += f". (排除以下内容: {negative_prompt})"
-    system_instruction = "你是一个顶级的AI绘画提示词工程师。你的任务是分析用户提供的包含正面和负面描述的中文草稿，然后创作出一个全新的、艺术性的、详细生动的英文提示词。请将负面描述（例如'排除太阳'）自然地融入到正面描述中，通过使用替代性或描述性词语来实现排除效果（例如，使用'overcast sky'或'cloudy day'来代替'no sun'）。最终的输出必须是一段流畅、连贯、可以直接用于AI绘画的英文描述，**绝对不能包含** 'exclude', 'without', 'no' 等直接的否定词或括号。你的目标是创造一个画面，而不是列出指令。"
+    system_instruction = """你是一个提示词优化器。你的任务是将用户的想法转换成高质量的英文AI绘画提示词。
+用户会提供一个组合输入，包含正面提示词，并可能附带一个括号说明的负面提示词。
+你的输出**必须是**一个连贯的、艺术性的英文段落。
+你的输出**绝不能**包含任何中文字符。
+你的输出**绝不能**包含任何解释或对话性文字。
+你的输出**绝不能**包含 'no', 'without', 'exclude' 等直接的否定关键词。你应该通过描述期望的场景来巧妙地达到排除效果。
+
+示例 1:
+用户输入: "一个女孩在雨中. (排除以下内容: 悲伤的表情)"
+你的输出: "A girl standing in the rain, her expression is serene and peaceful, water droplets clinging to her hair and clothes, city lights reflecting on the wet pavement."
+
+示例 2:
+用户输入: "一只猫，赛博朋克风格. (排除以下内容: 红色)"
+你的输出: "A sleek cybernetic cat prowls through a neon-lit alleyway, its metallic fur shimmering with hues of electric blue and vibrant purple, glowing circuits tracing patterns across its body, the cityscape dominated by cool tones."
+
+示例 3:
+用户输入: "广阔的奇幻森林"
+你的输出: "A vast, enchanted forest, ancient trees with glowing moss, ethereal light filtering through the dense canopy, a sense of magic and mystery in the air."
+
+现在，处理以下用户输入。"""
     try:
         response = await client.aio.models.generate_content(
             model="gemini-2.5-flash-lite-preview-06-17",
