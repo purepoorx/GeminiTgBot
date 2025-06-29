@@ -861,32 +861,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 save_user_data()
 
         # --- API Call Config ---
-        thinking_config = types.ThinkingConfig(include_thoughts=True) if thinking_mode else None
-        request_config = genai.types.GenerateContentConfig(thinking_config=thinking_config)
-        session_creation_config = genai.types.GenerateContentConfig(
-             system_instruction=genai.types.Content(parts=[genai.types.Part(text=system_instruction_text)]) if system_instruction_text else None
-        )
+        # 【最终修复方案】统一构建配置对象
+        final_config_args = {}
+        if thinking_mode:
+            final_config_args['thinking_config'] = genai.types.ThinkingConfig(include_thoughts=True)
+        if system_instruction_text:
+            final_config_args['system_instruction'] = genai.types.Content(parts=[genai.types.Part(text=system_instruction_text)])
+        
+        final_config = genai.types.GenerateContentConfig(**final_config_args) if final_config_args else None
 
         # --- API Call ---
         if chat_mode == 'multi_turn':
             if 'chat' not in user_data[user_id] or user_data[user_id].get('chat_model_name') != chat_model:
-                logger.info(f"为用户 {user_id} 创建新的聊天会话，配置: {session_creation_config}") # 日志4
-                user_data[user_id]['chat'] = client.aio.chats.create(model=chat_model, config=session_creation_config, history=[])
+                logger.info(f"为用户 {user_id} 创建新的聊天会话，配置: {final_config}") # 日志4
+                user_data[user_id]['chat'] = client.aio.chats.create(model=chat_model, config=final_config, history=[])
                 user_data[user_id]['chat_model_name'] = chat_model
-            chat = user_data[user_id]['chat']
-            # 【最终修复方案】
-            # 只有在 thinking_mode 开启时，才需要传递 config。
-            # system_instruction 已经固化在会话中，无需再次传递。
-            config_to_send = None
-            if thinking_mode:
-                config_to_send = genai.types.GenerateContentConfig(
-                    thinking_config=genai.types.ThinkingConfig(include_thoughts=True)
-                )
             
-            response_stream = await chat.send_message_stream(user_content_parts, config=config_to_send)
+            chat = user_data[user_id]['chat']
+            # 在 send_message 时，不传递 config，让会话自行管理状态
+            response_stream = await chat.send_message_stream(user_content_parts)
         else: # single_turn
-            request_config.system_instruction = session_creation_config.system_instruction
-            response_stream = await client.aio.models.generate_content_stream(model=chat_model, contents=user_content_parts, config=request_config)
+            response_stream = await client.aio.models.generate_content_stream(model=chat_model, contents=user_content_parts, config=final_config)
 
         # --- Stream Processing ---
         async for chunk in response_stream:
