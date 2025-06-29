@@ -874,11 +874,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 user_data[user_id]['chat'] = client.aio.chats.create(model=chat_model, config=session_creation_config, history=[])
                 user_data[user_id]['chat_model_name'] = chat_model
             chat = user_data[user_id]['chat']
-            final_request_config = genai.types.GenerateContentConfig(
-                system_instruction=session_creation_config.system_instruction,
-                thinking_config=thinking_config
-            )
-            response_stream = await chat.send_message_stream(user_content_parts, config=final_request_config)
+            # 【最终修复方案】
+            # 只有在 thinking_mode 开启时，才需要传递 config。
+            # system_instruction 已经固化在会话中，无需再次传递。
+            config_to_send = None
+            if thinking_mode:
+                config_to_send = genai.types.GenerateContentConfig(
+                    thinking_config=genai.types.ThinkingConfig(include_thoughts=True)
+                )
+            
+            response_stream = await chat.send_message_stream(user_content_parts, config=config_to_send)
         else: # single_turn
             request_config.system_instruction = session_creation_config.system_instruction
             response_stream = await client.aio.models.generate_content_stream(model=chat_model, contents=user_content_parts, config=request_config)
