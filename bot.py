@@ -114,10 +114,10 @@ def pcm_to_wav_in_memory(pcm_data: bytes, channels=1, sample_width=2, rate=24000
     return wav_buffer
 
 # --- 模型与默认值 ---
-DEFAULT_CHAT_MODEL = 'models/gemini-1.5-flash'
+DEFAULT_CHAT_MODEL = 'models/gemini-2.5-flash-lite-preview-06-17'
 DEFAULT_IMAGE_MODEL = 'models/imagen-3.0-generate-002'
 DEFAULT_MULTIMODAL_MODEL = 'models/gemini-2.0-flash-preview-image-generation'
-DEFAULT_TTS_MODEL = 'models/tts-001'
+DEFAULT_TTS_MODEL = 'models/gemini-2.5-pro-preview-tts'
 DEFAULT_TTS_VOICE = 'Zephyr'
 
 PRESET_IMAGE_MODELS = [
@@ -169,7 +169,7 @@ async def optimize_prompt_async(prompt: str, negative_prompt: str) -> str:
     system_instruction = "你是一个顶级的AI绘画提示词工程师。你的任务是分析用户提供的包含正面和负面描述的中文草稿，然后创作出一个全新的、艺术性的、详细生动的英文提示词。请将负面描述（例如'排除太阳'）自然地融入到正面描述中，通过使用替代性或描述性词语来实现排除效果（例如，使用'overcast sky'或'cloudy day'来代替'no sun'）。最终的输出必须是一段流畅、连贯、可以直接用于AI绘画的英文描述，**绝对不能包含** 'exclude', 'without', 'no' 等直接的否定词或括号。你的目标是创造一个画面，而不是列出指令。"
     try:
         response = await client.aio.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite-preview-06-17",
             contents=optimization_text,
             config=genai.types.GenerateContentConfig(system_instruction=system_instruction)
         )
