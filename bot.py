@@ -220,7 +220,7 @@ async def send_generate_panel(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"🎨 *艺术风格*: {style_text}\n"
         f"🖼️ *宽高比*: {settings.get('aspect_ratio')}\n"
         f"✨ *提示词优化*: {optimize_text}\n\n"
-        f"请通过下方的按钮进行设置，完成后点击“生成图片”。"
+        f"请通过下方的按钮进行设置，完成后点击“生成图片” 。"
     )
     keyboard = [
         [InlineKeyboardButton("1️⃣ 设置主提示词", callback_data="generate_action_set_main_prompt"), InlineKeyboardButton("2️⃣ 设置负面提示词", callback_data="generate_action_set_negative_prompt")],
@@ -503,7 +503,6 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     status_text = (
         f"当前聊天模式: *{'多轮' if chat_mode == 'multi_turn' else '单轮'}*\n"
-        f"当前思考过程: *{'开启' if thinking_mode else '关闭'}*\n"
         f"当前聊天模型: `{escape_markdown_v2(chat_model)}`\n"
         f"当前专业图片模型: Imagen: `{escape_markdown_v2(image_model)}`\n"
         f"当前多模态模型: Gemini: `{escape_markdown_v2(multimodal_model)}`\n"
@@ -515,7 +514,6 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     keyboard = [
         [InlineKeyboardButton("🤖 模型设置", callback_data="settings_menu_models")],
         [InlineKeyboardButton(f"切换到 {'单轮' if chat_mode == 'multi_turn' else '多轮'} 模式", callback_data="settings_action_toggle_chat_mode")],
-        [InlineKeyboardButton(f"思考过程: {'点击关闭' if thinking_mode else '点击开启'}", callback_data="settings_action_toggle_thinking_mode")],
         [InlineKeyboardButton("🗣️ 语音声线设置", callback_data="settings_menu_voice")],
         [InlineKeyboardButton("📝 设置系统提示", callback_data="settings_action_set_prompt")],
         [InlineKeyboardButton("❌ 关闭菜单", callback_data="settings_action_close")],
@@ -545,12 +543,6 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
             del user_data[user_id]['chat']
         if 'file_context' in user_data[user_id]:
             del user_data[user_id]['file_context']
-        save_user_data()
-        await settings_command(update, context)
-    elif action == "settings_action_toggle_thinking_mode":
-        current_mode = user_data[user_id].get('thinking_mode', False)
-        new_mode = not current_mode
-        user_data[user_id]['thinking_mode'] = new_mode
         save_user_data()
         await settings_command(update, context)
     elif action == "settings_action_close":
@@ -834,7 +826,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         full_response = ""
-        thought_summary = ""
         last_edit_time = 0
         edit_interval = 1.0  # Slower update interval to reduce API calls
 
@@ -845,7 +836,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         system_instruction_text = user_data[user_id].get('system_prompt')
         logger.info(f"为用户 {user_id} 加载的系统提示词: '{system_instruction_text}'") # 日志3
-        thinking_mode = user_data.get(user_id, {}).get('thinking_mode', False)
 
         # --- Build Content ---
         user_content_parts = []
@@ -863,11 +853,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # --- API Call Config ---
         # 【最终修复方案】统一构建配置对象
         final_config_args = {}
-        if thinking_mode:
-            final_config_args['thinking_config'] = genai.types.ThinkingConfig(include_thoughts=True)
         if system_instruction_text:
             final_config_args['system_instruction'] = genai.types.Content(parts=[genai.types.Part(text=system_instruction_text)])
-        
+
         final_config = genai.types.GenerateContentConfig(**final_config_args) if final_config_args else None
 
         # --- API Call ---
@@ -889,19 +877,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 for candidate in chunk.candidates:
                     if candidate.content and candidate.content.parts:
                         for part in candidate.content.parts:
-                            if getattr(part, 'thought', False):
-                                thought_summary += part.text
-                            elif part.text:
+                            if part.text:
                                 full_response += part.text
             
             current_time = asyncio.get_event_loop().time()
             if current_time - last_edit_time > edit_interval:
-                raw_display_text = ""
-                if thought_summary:
-                    raw_display_text += f"🤔 思考摘要:\n{thought_summary}\n\n---\n"
-                raw_display_text += f"{full_response} ▌"
-                
-                display_text = escape_markdown_v2(raw_display_text)
+                display_text = escape_markdown_v2(f"{full_response} ▌")
                 if len(display_text) > 4000:
                     display_text = "[...]\n" + display_text[-3995:]
 
@@ -922,42 +903,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         message_id = placeholder_message.message_id
         final_response_text = full_response if full_response.strip() else "模型没有返回任何内容。"
 
-        # If thinking is enabled and we have a summary, prepare for interactive display
-        if thought_summary and thinking_mode:
-            if 'thought_caches' not in context.bot_data:
-                context.bot_data['thought_caches'] = {}
-            context.bot_data['thought_caches'][message_id] = {'thought': thought_summary, 'response': final_response_text}
-            context.job_queue.run_once(cleanup_thought_cache, 300, data={'message_id': message_id}, name=f"cleanup_{message_id}")
-            
-            keyboard = [[InlineKeyboardButton("🤔 显示思考摘要", callback_data=f"toggle_thought:{message_id}:show")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await context.bot.edit_message_text(
-                text=escape_markdown_v2(final_response_text),
-                chat_id=placeholder_message.chat_id,
-                message_id=message_id,
-                parse_mode=ParseMode.MARKDOWN_V2,
-                reply_markup=reply_markup
-            )
-        else:
-            # For non-thinking mode or if no thoughts were generated
-            escaped_final_text = escape_markdown_v2(final_response_text)
-            if len(escaped_final_text) > 4096:
-                await context.bot.delete_message(chat_id=placeholder_message.chat_id, message_id=message_id)
-                parts = [escaped_final_text[i:i + 4096] for i in range(0, len(escaped_final_text), 4096)]
-                for part in parts:
-                    await context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=part,
-                        parse_mode=ParseMode.MARKDOWN_V2
-                    )
-            else:
-                 await context.bot.edit_message_text(
-                    text=escaped_final_text,
-                    chat_id=placeholder_message.chat_id,
-                    message_id=message_id,
+        escaped_final_text = escape_markdown_v2(final_response_text)
+        if len(escaped_final_text) > 4096:
+            await context.bot.delete_message(chat_id=placeholder_message.chat_id, message_id=message_id)
+            parts = [escaped_final_text[i:i + 4096] for i in range(0, len(escaped_final_text), 4096)]
+            for part in parts:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=part,
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
+        else:
+                await context.bot.edit_message_text(
+                text=escaped_final_text,
+                chat_id=placeholder_message.chat_id,
+                message_id=message_id,
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
 
     except Exception as e:
         logger.error(f"处理消息时出错: {e}", exc_info=True)
@@ -973,14 +935,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             del user_data[user_id]['file_context']
             save_user_data()
 
-async def cleanup_thought_cache(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Job to remove an expired thought cache."""
-    job = context.job
-    message_id = job.data['message_id']
-    if 'thought_caches' in context.bot_data and message_id in context.bot_data['thought_caches']:
-        del context.bot_data['thought_caches'][message_id]
-        logger.info(f"Cleaned up expired thought cache for message_id: {message_id}")
-
 async def set_bot_commands(application: Application):
     """设置机器人的命令列表，以便在Telegram中显示提示"""
     commands = [
@@ -994,73 +948,6 @@ async def set_bot_commands(application: Application):
         BotCommand("cancel", "取消当前操作"),
     ]
     await application.bot.set_my_commands(commands)
-
-@authorized
-async def toggle_thought_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """处理显示/隐藏思考摘要的按钮回调"""
-    query = update.callback_query
-    await query.answer()
-
-    try:
-        _, message_id_str, action = query.data.split(':')
-        message_id = int(message_id_str)
-    except (ValueError, IndexError):
-        await query.edit_message_text("无效的回调数据。")
-        return
-
-    cached_data = context.bot_data.get('thought_caches', {}).get(message_id)
-    if not cached_data:
-        await query.edit_message_text("抱歉，这条消息的思考摘要已过期。")
-        return
-
-    thought = cached_data['thought']
-    response = cached_data['response']
-    
-    new_text = ""
-    keyboard = None
-
-    if action == 'show':
-        new_text = f"🤔 思考摘要:\n{thought}\n\n---\n{response}"
-        keyboard = [[InlineKeyboardButton("🫣 隐藏思考摘要", callback_data=f"toggle_thought:{message_id}:hide")]]
-    elif action == 'hide':
-        new_text = response
-        keyboard = [[InlineKeyboardButton("🤔 显示思考摘要", callback_data=f"toggle_thought:{message_id}:show")]]
-
-    try:
-        # Check if the combined text will be too long
-        if action == 'show' and len(escape_markdown_v2(new_text)) > 4096:
-            # If too long, send the thought process as new messages
-            await query.edit_message_text(
-                text=escape_markdown_v2(response),
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ 思考摘要已在下方发送", callback_data="noop")]]),
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text="🤔 *思考摘要*",
-                parse_mode=ParseMode.MARKDOWN_V2,
-                reply_to_message_id=query.message.message_id
-            )
-
-            thought_parts = [thought[i:i + 4096] for i in range(0, len(thought), 4096)]
-            for part in thought_parts:
-                await context.bot.send_message(
-                    chat_id=query.message.chat_id,
-                    text=escape_markdown_v2(part),
-                    parse_mode=ParseMode.MARKDOWN_V2
-                )
-        else:
-            # If not too long, edit the message as usual
-            await query.edit_message_text(
-                text=escape_markdown_v2(new_text),
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-    except BadRequest as e:
-        if "Message is not modified" not in str(e):
-            logger.error(f"编辑消息以切换思考摘要时出错: {e}")
-            await query.message.reply_text(f"抱歉，切换时发生错误: {e}")
 
 # --- 主函数 ---
 def main() -> None:
@@ -1112,7 +999,6 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(tts_callback_handler, pattern="^tts_"))
     application.add_handler(CallbackQueryHandler(generate_callback_handler, pattern="^generate_(?!set)"))
     application.add_handler(CallbackQueryHandler(generate_selection_callback_handler, pattern="^generate_set:"))
-    application.add_handler(CallbackQueryHandler(toggle_thought_handler, pattern="^toggle_thought:"))
 
     logger.info("机器人正在启动...")
     application.run_polling()
